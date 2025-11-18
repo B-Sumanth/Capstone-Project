@@ -1,0 +1,103 @@
+/*
+  Sensor-Based Parking Assistant System
+  Optimized Arduino Code
+  Includes:
+  - 4 Ultrasonic Sensors (Front, Back, Left, Right)
+  - Multi-level buzzer and LED alerts
+  - Bluetooth Communication (via Serial, e.g., HC-05)
+*/
+
+// === Pin Definitions ===
+const int trigPins[] = {2, 4, 6, 8};
+const int echoPins[] = {3, 5, 7, 9};
+const int ledPins[]  = {11, 12, 13, 13}; // Front, Back, Left, Right (Left/Right share LED)
+const String directions[] = {"Front", "Back", "Left", "Right"};
+
+// Buzzer pin
+const int buzzerPin = 10;
+
+void setup() {
+  Serial.begin(9600);  // for HC-05
+
+  // Setup pin modes
+  for (int i = 0; i < 4; i++) {
+    pinMode(trigPins[i], OUTPUT);
+    pinMode(echoPins[i], INPUT);
+    pinMode(ledPins[i], OUTPUT);
+  }
+  pinMode(buzzerPin, OUTPUT);
+
+  Serial.println("🚗 Parking Assistant System Initialized");
+}
+
+void loop() {
+  int distances[4];
+
+  // Read distances for all sensors
+  for (int i = 0; i < 4; i++) {
+    distances[i] = getDistance(trigPins[i], echoPins[i]);
+  }
+
+  // Send data over Bluetooth
+  Serial.print("Data:");
+  for (int i = 0; i < 4; i++) {
+    Serial.print(directions[i]);
+    Serial.print(":");
+    Serial.print(distances[i]);
+    Serial.print("cm ");
+  }
+  Serial.println();
+
+  // Reset all outputs
+  resetOutputs();
+
+  // Process sensor warnings
+  for (int i = 0; i < 4; i++) {
+    processSensor(distances[i], ledPins[i], directions[i]);
+  }
+
+  delay(200);
+}
+
+// Function: measure distance using HC-SR04
+int getDistance(int trigPin, int echoPin) {
+  long duration;
+  int distance;
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH, 30000); // Timeout: 30ms (~5m)
+  if (duration == 0) return 999; // No object detected
+  distance = duration * 0.034 / 2; // cm
+
+  return distance;
+}
+
+// Function: process individual sensor logic
+void processSensor(int distance, int ledPin, String direction) {
+  if (distance <= 15) {
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 1000);   // Continuous alert
+    Serial.println("🚨 DANGER! " + direction);
+  } 
+  else if (distance <= 30) {
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 800, 200);    // Fast beep
+    delay(100);
+  } 
+  else if (distance <= 60) {
+    digitalWrite(ledPin, HIGH);
+    tone(buzzerPin, 600, 200);    // Slow beep
+    delay(300);
+  }
+}
+
+// Reset all LEDs & buzzer
+void resetOutputs() {
+  for (int i = 0; i < 4; i++) digitalWrite(ledPins[i], LOW);
+  noTone(buzzerPin);
+}
